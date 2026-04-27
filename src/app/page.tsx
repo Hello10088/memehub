@@ -1,68 +1,118 @@
 import Link from "next/link";
-
-import { LatestPost } from "~/app/_components/post";
+import { Suspense } from "react";
 import { auth } from "~/server/auth";
-import { api, HydrateClient } from "~/trpc/server";
+import { HydrateClient, api } from "~/trpc/server";
+import { MemeGrid } from "~/components/meme/meme-grid";
+import { MemeGridSkeleton } from "~/components/meme/meme-grid-skeleton";
+import { MemeSearchBar } from "~/components/meme/meme-search-bar";
+import { TagList } from "~/components/meme/tag-list";
 
-export default async function Home() {
-  const hello = await api.post.hello({ text: "from tRPC" });
+type SearchParams = Promise<{ q?: string; tag?: string; sort?: string }>;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const session = await auth();
+  const params = await searchParams;
+  const query = params.q;
+  const tag = params.tag;
+  const sort = params.sort === "popular" ? "popular" : "latest";
 
-  if (session?.user) {
-    void api.post.getLatest.prefetch();
-  }
+  const result = await api.meme.list({ query, tag, sort, limit: 20 });
 
   return (
     <HydrateClient>
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-        <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
-          </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/usage/first-steps"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">First Steps →</h3>
-              <div className="text-lg">
-                Just the basics - Everything you need to know to set up your
-                database and authentication.
-              </div>
-            </Link>
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/introduction"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">Documentation →</h3>
-              <div className="text-lg">
-                Learn more about Create T3 App, the libraries it uses, and how
-                to deploy it.
-              </div>
-            </Link>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-2xl text-white">
-              {hello ? hello.greeting : "Loading tRPC query..."}
+      <main className="min-h-screen">
+        <section className="border-b bg-muted/30">
+          <div className="container mx-auto px-4 py-16 text-center">
+            <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+              Today&apos;s mood?
+            </h1>
+            <p className="mt-3 text-lg text-muted-foreground">
+              Find the perfect meme reaction. Search, collect, share.
             </p>
 
-            <div className="flex flex-col items-center justify-center gap-4">
-              <p className="text-center text-2xl text-white">
-                {session && <span>Logged in as {session.user?.name}</span>}
-              </p>
+            {session?.user && (
               <Link
-                href={session ? "/api/auth/signout" : "/api/auth/signin"}
-                className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
+                href="/upload"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition hover:opacity-90"
               >
-                {session ? "Sign out" : "Sign in"}
+                Upload Meme
               </Link>
+            )}
+
+            {!session?.user && result.items.length === 0 && (
+              <Link
+                href="/signin"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                Get Started — It&apos;s Free
+              </Link>
+            )}
+
+            <div className="mx-auto mt-6 flex justify-center">
+              <Suspense>
+                <MemeSearchBar />
+              </Suspense>
+            </div>
+
+            <div className="mx-auto mt-6 max-w-2xl">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Popular tags
+              </p>
+              <Suspense fallback={<div className="h-8" />}>
+                <TagList />
+              </Suspense>
+            </div>
+          </div>
+        </section>
+
+        <section className="container mx-auto px-4 py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-bold">
+              {query
+                ? `Results for "${query}"`
+                : tag
+                  ? `Tag: ${tag}`
+                  : "Latest Memes"}
+            </h2>
+            <div className="flex gap-2 text-sm">
+              <a
+                href={`/?${new URLSearchParams({ ...(query && { q: query }), ...(tag && { tag }), sort: "latest" }).toString()}`}
+                className={
+                  sort === "latest"
+                    ? "font-semibold underline"
+                    : "text-muted-foreground"
+                }
+              >
+                Latest
+              </a>
+              <a
+                href={`/?${new URLSearchParams({ ...(query && { q: query }), ...(tag && { tag }), sort: "popular" }).toString()}`}
+                className={
+                  sort === "popular"
+                    ? "font-semibold underline"
+                    : "text-muted-foreground"
+                }
+              >
+                Popular
+              </a>
             </div>
           </div>
 
-          {session?.user && <LatestPost />}
-        </div>
+          <Suspense fallback={<MemeGridSkeleton />}>
+            <MemeGrid
+              memes={result.items}
+              emptyMessage={
+                query
+                  ? `No memes found for "${query}". Try another keyword.`
+                  : "No memes yet. Upload your first one!"
+              }
+            />
+          </Suspense>
+        </section>
       </main>
     </HydrateClient>
   );

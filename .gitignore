@@ -44,3 +44,8 @@ yarn-error.log*
 
 # idea files
 .idea
+.claude
+
+# uploaded content (keep directory)
+public/uploads/*
+!public/uploads/.gitkeep
