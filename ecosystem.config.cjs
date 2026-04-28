@@ -1,11 +1,10 @@
 module.exports = {
   apps: [{
     name: "memebox",
-    script: "npm",
-    args: "run start",
+    script: "./node_modules/.bin/next",
+    args: "start -p 3005",
     env: {
       NODE_ENV: "production",
-      PORT: 3000,
     },
   }],
 };

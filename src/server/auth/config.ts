@@ -38,8 +38,11 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
-const providers = [DiscordProvider] as NextAuthConfig["providers"];
+const providers: NextAuthConfig["providers"] = [];
 
+if (process.env.AUTH_DISCORD_ID && process.env.AUTH_DISCORD_SECRET) {
+  providers.push(DiscordProvider);
+}
 if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET) {
   providers.push(GitHubProvider);
 }
